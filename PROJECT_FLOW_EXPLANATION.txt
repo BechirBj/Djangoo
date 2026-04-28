@@ -1,0 +1,240 @@
+IDEA PRO MAX — Event Experience Platform
+Project Flow Explanation (Home → Auth → User Data → Events → Participation → Reviews)
+
+1) Starting from the Home Screen (Dashboard)
+
+URL
+- / (root)
+
+Routing
+- Root URLs include the app URLs:
+  file: c:\Users\verzatchi\Desktop\DJANGO\eventproject\urls.py
+- Home route is mapped here:
+  file: c:\Users\verzatchi\Desktop\DJANGO\events\urls.py
+  path("", views.home, name="home")
+
+View logic (home)
+- file: c:\Users\verzatchi\Desktop\DJANGO\events\views.py
+- The home() view prepares:
+  - upcoming_events: next 5 events in the future (date >= now)
+  - user_badges: only if the user is authenticated
+- Key idea:
+  request.user is always available because "django.template.context_processors.request"
+  is enabled in settings.
+
+Template (home.html)
+- file: c:\Users\verzatchi\Desktop\DJANGO\templates\home.html
+- It shows a “Login to Join” button when the user is NOT connected:
+  {% if user.is_authenticated %}
+      ... show Create Event ...
+  {% else %}
+      ... show Login to Join ...
+  {% endif %}
+
+2) How to show Login / Register buttons if the user is not connected
+
+This is handled globally in the navbar (base.html).
+
+Template (base.html)
+- file: c:\Users\verzatchi\Desktop\DJANGO\templates\base.html
+- Navbar logic:
+  - If user.is_authenticated:
+    shows Create + username + Logout
+  - Else:
+    shows Login + Register
+
+Why this works
+- Django injects “user” into every template via:
+  "django.contrib.auth.context_processors.auth"
+- So you can always do:
+  {% if user.is_authenticated %} ... {% endif %}
+
+3) After Logging In: what happens and where the user comes from
+
+Login page
+- URL: /login/
+- Template:
+  file: c:\Users\verzatchi\Desktop\DJANGO\templates\auth\login.html
+- View:
+  file: c:\Users\verzatchi\Desktop\DJANGO\events\views.py
+  function: login_view()
+
+What login_view() does (high level)
+- Validates the credentials via Django’s AuthenticationForm (styled as LoginForm).
+- Calls authenticate(...) and then login(request, user)
+- After success it redirects to "home"
+
+Result
+- Django stores the user ID in the session.
+- On the next request, AuthenticationMiddleware sets:
+  request.user = the logged-in user object
+
+4) How to fetch the data related to the user (example: badges)
+
+The pattern used in this project:
+- Always check authentication first:
+  if request.user.is_authenticated:
+      ... query user-related tables ...
+
+Example: fetching badges in home()
+- file: c:\Users\verzatchi\Desktop\DJANGO\events\views.py
+  user_badges = UserBadge.objects.select_related("badge").filter(user=request.user)
+
+What select_related("badge") does
+- It fetches the related Badge in the same query, so templates can do:
+  ub.badge.name
+  without extra database queries.
+
+Where badges are shown
+- file: c:\Users\verzatchi\Desktop\DJANGO\templates\home.html
+- This section is only rendered for logged-in users:
+  {% if user.is_authenticated %}
+      ... loop user_badges ...
+  {% endif %}
+
+5) How to fetch events (list page) + search + pagination
+
+Events list URL
+- /events/
+
+View (event_list)
+- file: c:\Users\verzatchi\Desktop\DJANGO\events\views.py
+  function: event_list()
+
+What event_list() returns
+- It builds a queryset with computed fields:
+  - participant_count: number of Participation rows for the event
+  - avg_rating: average of Review.rating for the event
+- This is done in _event_list_base_queryset() using subqueries, so counts/averages
+  are not distorted by joins.
+
+Search (?q=)
+- event_list reads:
+  q = (request.GET.get("q") or "").strip()
+- If q is provided, it filters:
+  title contains q OR location contains q
+
+Pagination (6 per page)
+- event_list creates:
+  paginator = Paginator(qs, 6)
+  page_obj = paginator.get_page(request.GET.get("page"))
+- The template receives page_obj.
+
+Template (events/list.html)
+- file: c:\Users\verzatchi\Desktop\DJANGO\templates\events\list.html
+- It renders:
+  - A GET search form (keeps q in the input)
+  - The event cards from page_obj.object_list
+  - Pagination controls using page_obj.has_previous / has_next
+
+6) How to participate (join an event)
+
+Where participation UI lives
+- Event detail page:
+  /events/<id>/
+- Template:
+  file: c:\Users\verzatchi\Desktop\DJANGO\templates\events\detail.html
+  section: “Participation”
+
+How we decide whether to show the participation form or the login prompt
+- In detail.html:
+  {% if user.is_authenticated %}
+      show the form (POSTs to /events/<id>/join/)
+  {% else %}
+      show “Login to join this event.”
+  {% endif %}
+
+How participation data is fetched for this user
+- In the event_detail() view:
+  user_participation = Participation.objects.filter(user=request.user, event=event).first()
+- If it exists, we build the form with instance=user_participation so the dropdown
+  is pre-selected with the saved status.
+
+Submitting participation
+- The join form POSTs to:
+  /events/<id>/join/
+- View:
+  file: c:\Users\verzatchi\Desktop\DJANGO\events\views.py
+  function: event_join()
+
+What event_join() does (upsert pattern)
+- It loads the event
+- It checks if a Participation already exists for (user, event)
+- It binds ParticipationForm(..., instance=existing_or_none)
+- It saves with:
+  participation.user = request.user
+  participation.event = event
+  participation.save()
+
+After saving participation
+- It calls check_and_award_badges(request.user)
+- It sets a success message and redirects back to the event detail page
+
+7) How reviews work (create vs update) and “Update Review” button display
+
+Where the reviews UI lives
+- Event detail page:
+  /events/<id>/
+- Template:
+  file: c:\Users\verzatchi\Desktop\DJANGO\templates\events\detail.html
+  section: “Reviews”
+
+How we fetch the review for the current user
+- In the event_detail() view:
+  user_review = Review.objects.filter(user=request.user, event=event).first()
+- Then:
+  review_form = ReviewForm(instance=user_review)
+- Meaning:
+  - If user_review exists, the form is pre-filled with their existing rating/comment
+  - If it doesn’t exist, the form is empty for a new review
+
+How we show “Update Review” if user_review is True (exists)
+- In detail.html, the submit button text is:
+  {% if user_review %}Update Review{% else %}Submit Review{% endif %}
+- Because user_review is either:
+  - a Review object (truthy)
+  - or None (falsy)
+
+Submitting the review (create OR update)
+- The review form POSTs to:
+  /events/<id>/review/
+- View:
+  file: c:\Users\verzatchi\Desktop\DJANGO\events\views.py
+  function: event_review()
+
+What event_review() does
+- Finds existing review:
+  review = Review.objects.filter(user=request.user, event=event).first()
+- Creates the form with instance=review:
+  form = ReviewForm(request.POST, instance=review)
+- Then:
+  - If review existed → it updates the same row
+  - If review did not exist → it creates a new row
+- Saves it with:
+  review.user = request.user
+  review.event = event
+  review.rating = int(form.cleaned_data["rating"])
+  review.save()
+
+After saving a review
+- It calls check_and_award_badges(request.user)
+- It shows a success message and redirects back to the detail page
+
+8) Badge awarding in the background
+
+Where logic is implemented
+- file: c:\Users\verzatchi\Desktop\DJANGO\events\views.py
+  function: check_and_award_badges(user)
+
+When it is called
+- After event creation (event_create)
+- After participation (event_join)
+- After review submission/update (event_review)
+
+What it checks
+- Participations count (First Step, Social Butterfly)
+- Reviews count (Critic)
+- Created events count (Party Starter)
+
+That’s the complete request/response flow:
+URL → view queries → context variables → template conditions → form POST → update DB → messages → redirect.

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Categories</h1>
+      <div class="text-muted">Manage event categories.</div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-5">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h2 class="h5 mb-3"><i class="bi bi-tag me-1"></i>Create Category</h2>
+          <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label">Name</label>
+              {{ form.name }}
+              {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
+            </div>
+            <button class="btn btn-primary w-100" type="submit">
+              <i class="bi bi-plus-circle me-1"></i>Add
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-7">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h2 class="h5 mb-3"><i class="bi bi-tags me-1"></i>All Categories</h2>
+          {% if categories %}
+            <div class="list-group">
+              {% for category in categories %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                  <div class="fw-semibold">{{ category.name }}</div>
+                  <div class="d-flex gap-2">
+                    <a class="btn btn-sm btn-outline-dark" href="{% url 'category_edit' category.id %}">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <form method="post" action="{% url 'category_delete' category.id %}" onsubmit="return confirm('Delete this category?');">
+                      {% csrf_token %}
+                      <button class="btn btn-sm btn-outline-danger" type="submit">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-muted">No categories yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

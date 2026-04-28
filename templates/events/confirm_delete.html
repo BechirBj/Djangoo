@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-7">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h1 class="h4 mb-2 text-danger">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>Confirm Delete
+          </h1>
+          <p class="text-muted mb-4">This action cannot be undone.</p>
+
+          <div class="border rounded p-3 mb-4">
+            <div class="fw-semibold">{{ object }}</div>
+            {% if type == "event" %}
+              <div class="text-muted small mt-1">Event</div>
+            {% endif %}
+          </div>
+
+          <form method="post">
+            {% csrf_token %}
+            <div class="d-flex gap-2">
+              <button class="btn btn-danger" type="submit">
+                <i class="bi bi-trash me-1"></i>Delete
+              </button>
+              <a class="btn btn-outline-dark" href="{% url 'event_detail' object.id %}">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
