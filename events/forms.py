@@ -29,7 +29,7 @@ class EventForm(forms.ModelForm):
         }
 
 
-class ReviwewForm(forms.ModelForm):
+class ReviewForm(forms.ModelForm):
     rating = forms.ChoiceField(
         choices=[(i, str(i)) for i in range(1, 6)],
         widget=forms.Select(attrs={"class": "form-select"}),
