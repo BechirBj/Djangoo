@@ -66,5 +66,13 @@ class UserBadge(models.Model):
     badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
     awarded_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "badge"],
+                name="unique_user_badge"
+            )
+        ]
+
     def __str__(self):
         return f"{self.user} earned {self.badge}"

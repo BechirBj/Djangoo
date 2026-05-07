@@ -38,9 +38,11 @@ def check_and_award_badges(user):
         award_badge(user, "Party Starter")
 
 
-
 def home(request):
-    events = Event.objects.order_by("date")[:5]
+    events = Event.objects.annotate(
+        participant_count=Count("participation")
+    ).order_by("date")[:5]
+
     user_badges = []
 
     if request.user.is_authenticated:
@@ -50,7 +52,6 @@ def home(request):
         "upcoming_events": events,
         "user_badges": user_badges,
     })
-
 
 def event_list(request):
     events = Event.objects.annotate(
