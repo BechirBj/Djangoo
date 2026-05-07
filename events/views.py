@@ -3,7 +3,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
-
+from django.db.models import Count
 from .forms import CategoryForm, EventForm, LoginForm, ParticipationForm, RegisterForm, ReviewForm
 from .models import Badge, Category, Event, EventCategory, Participation, Review, UserBadge
 
@@ -52,21 +52,32 @@ def home(request):
     })
 
 
-
 def event_list(request):
-    events = Event.objects.order_by("date")
+    events = Event.objects.annotate(
+        participant_count=Count("participation")
+    ).order_by("date")
 
     q = request.GET.get("q", "")
     if q:
-        events = events.filter(title__icontains=q) | events.filter(location__icontains=q)
+        events = events.filter(
+            title__icontains=q
+        ) | events.filter(
+            location__icontains=q
+        )
 
-    print(events)
     paginator = Paginator(events, 6)
     page_obj = paginator.get_page(request.GET.get("page"))
+
     print(events.values())
 
-    return render(request, "events/list.html", {"page_obj": page_obj, "q": q})
-
+    return render(
+        request,
+        "events/list.html",
+        {
+            "page_obj": page_obj,
+            "q": q
+        }
+    )
 
 
 def event_detail(request, event_id):
